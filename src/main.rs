@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 use chumsky::{
     error::Cheap,
@@ -8,6 +9,27 @@ use chumsky::{
     text::{digits, whitespace},
     IterParser, Parser,
 };
+
+fn search_path(bin: &str) -> Option<PathBuf> {
+    std::env::var("PATH")
+        .unwrap_or_else(|_| String::new())
+        .split(':')
+        .map(Path::new)
+        .filter(|p| p.is_dir())
+        .find_map(|dir| {
+            dir.read_dir()
+                .expect("to be a directory")
+                .into_iter()
+                .filter_map(Result::ok)
+                .find_map(|entry| {
+                    if entry.file_name() == bin {
+                        Some(entry.path())
+                    } else {
+                        None
+                    }
+                })
+        })
+}
 
 #[derive(Debug, Clone)]
 enum ShellCmd<'a> {
@@ -135,7 +157,11 @@ fn main() -> eyre::Result<()> {
                     match parsed {
                         ShellCmd::Builtin(_) => println!("{cmd} is a shell builtin"),
                         ShellCmd::Unknown { cmd, args: _ } => {
-                            println!("{cmd} not found")
+                            if let Some(bin) = search_path(cmd) {
+                                println!("{} is {}", cmd, bin.display());
+                            } else {
+                                println!("{cmd} not found");
+                            }
                         }
                     }
                 }
