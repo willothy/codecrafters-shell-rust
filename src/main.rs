@@ -13,14 +13,14 @@ fn main() -> std::io::Result<()> {
         stdin.read_line(&mut input)?;
 
         // Enter the main loop
-        match input.trim() {
+        match input.trim_end_matches('\n') {
             "" => {}
-            "exit" => break,
             cmd => {
                 println!("{cmd}: command not found");
             }
         }
     }
 
+    #[allow(unreachable_code)]
     Ok(())
 }
