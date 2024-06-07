@@ -184,10 +184,15 @@ fn main() -> eyre::Result<()> {
                     );
                 }
                 Builtin::Cd { dir } => {
-                    let dir = Path::new(dir);
+                    let dir = if dir.starts_with('~') {
+                        PathBuf::from(format!("{}/{}", std::env::var("HOME")?, &dir[1..]))
+                    } else {
+                        PathBuf::from(dir)
+                    };
+
                     if dir.is_dir() {
                         std::env::set_current_dir(dir)?;
-                    } else if std::env::current_dir()?.join(dir).is_dir() {
+                    } else if dir.is_relative() && std::env::current_dir()?.join(&dir).is_dir() {
                         std::env::set_current_dir(std::env::current_dir()?.join(dir))?;
                     } else {
                         println!("{}: No such file or directory", dir.display());
