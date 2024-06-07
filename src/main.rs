@@ -73,6 +73,8 @@ enum Builtin {
     Exit { code: i32 },
     Echo { text: Vec<String> },
     Type { cmd: String },
+    Pwd,
+    Cd { dir: String },
 }
 
 impl Builtin {
@@ -104,6 +106,13 @@ impl Builtin {
                     .repeated()
                     .collect()
                     .map(|s| Builtin::Type { cmd: s }),
+            ),
+            just("pwd").to(Builtin::Pwd),
+            just("cd").ignore_then(whitespace()).ignore_then(
+                chumsky::primitive::none_of(" \t\r\n")
+                    .repeated()
+                    .collect()
+                    .map(|s| Builtin::Cd { dir: s }),
             ),
         ))
     }
@@ -167,6 +176,19 @@ fn main() -> eyre::Result<()> {
                             }
                         }
                     }
+                }
+                Builtin::Pwd => {
+                    println!(
+                        "{}",
+                        std::env::current_dir().expect("current dir").display()
+                    );
+                }
+                Builtin::Cd { dir } => {
+                    let dir = Path::new(dir);
+                    if !dir.is_dir() {
+                        println!("{} is not a directory", dir.display());
+                    }
+                    std::env::set_current_dir(dir)?;
                 }
             },
             ShellCmd::Unknown { cmd, args } => {
