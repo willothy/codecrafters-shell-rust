@@ -142,7 +142,7 @@ fn main() -> eyre::Result<()> {
             for e in parsed.errors() {
                 println!("{e}");
             }
-            // return Err(Report::);
+            break 'mainloop;
         }
 
         match parsed.output().expect("to have output") {
