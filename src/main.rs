@@ -47,6 +47,7 @@ impl<'a> ShellCmd<'a> {
 enum Builtin {
     Exit { code: i32 },
     Echo { text: Vec<String> },
+    Type { cmd: String },
 }
 
 impl Builtin {
@@ -72,6 +73,12 @@ impl Builtin {
                     .allow_trailing()
                     .collect()
                     .map(|args| Builtin::Echo { text: args }),
+            ),
+            just("type").ignore_then(whitespace()).ignore_then(
+                chumsky::primitive::none_of(" \t\r\n")
+                    .repeated()
+                    .collect()
+                    .map(|s| Builtin::Type { cmd: s }),
             ),
         ))
     }
@@ -120,6 +127,17 @@ fn main() -> eyre::Result<()> {
                         }
                     });
                     println!("");
+                }
+                Builtin::Type { cmd } => {
+                    let Ok(parsed) = ShellCmd::parser().parse(&*cmd).into_result() else {
+                        break 'mainloop;
+                    };
+                    match parsed {
+                        ShellCmd::Builtin(_) => println!("{cmd} is a shell builtin"),
+                        ShellCmd::Unknown { cmd, args: _ } => {
+                            println!("{cmd} not found")
+                        }
+                    }
                 }
             },
             ShellCmd::Unknown { cmd, .. } => {
