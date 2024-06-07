@@ -187,8 +187,8 @@ fn main() -> eyre::Result<()> {
                     let dir = Path::new(dir);
                     if dir.is_dir() {
                         std::env::set_current_dir(dir)?;
-                    // } else if std::env::current_dir()?.join(dir).is_dir() {
-                    //     std::env::set_current_dir(std::env::current_dir()?.join(dir))?;
+                    } else if std::env::current_dir()?.join(dir).is_dir() {
+                        std::env::set_current_dir(std::env::current_dir()?.join(dir))?;
                     } else {
                         println!("{}: No such file or directory", dir.display());
                     }
