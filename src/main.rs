@@ -185,10 +185,12 @@ fn main() -> eyre::Result<()> {
                 }
                 Builtin::Cd { dir } => {
                     let dir = Path::new(dir);
-                    if !dir.is_dir() {
-                        println!("{}: No such file or directory", dir.display());
-                    } else {
+                    if dir.is_dir() {
                         std::env::set_current_dir(dir)?;
+                    // } else if std::env::current_dir()?.join(dir).is_dir() {
+                    //     std::env::set_current_dir(std::env::current_dir()?.join(dir))?;
+                    } else {
+                        println!("{}: No such file or directory", dir.display());
                     }
                 }
             },
