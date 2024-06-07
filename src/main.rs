@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    process::Stdio,
+};
 
 use chumsky::{
     error::Cheap,
@@ -166,8 +169,20 @@ fn main() -> eyre::Result<()> {
                     }
                 }
             },
-            ShellCmd::Unknown { cmd, .. } => {
-                println!("{cmd}: command not found")
+            ShellCmd::Unknown { cmd, args } => {
+                if let Some(bin) = search_path(cmd) {
+                    std::process::Command::new(bin)
+                        .args(args)
+                        .stdin(Stdio::inherit())
+                        .stdout(Stdio::inherit())
+                        .stderr(Stdio::inherit())
+                        .spawn()
+                        .expect("to spawn program")
+                        .wait()
+                        .expect("to wait for process");
+                } else {
+                    println!("{cmd}: command not found");
+                }
             }
         }
     }
