@@ -186,9 +186,10 @@ fn main() -> eyre::Result<()> {
                 Builtin::Cd { dir } => {
                     let dir = Path::new(dir);
                     if !dir.is_dir() {
-                        println!("{} is not a directory", dir.display());
+                        println!("{}: No such file or directory", dir.display());
+                    } else {
+                        std::env::set_current_dir(dir)?;
                     }
-                    std::env::set_current_dir(dir)?;
                 }
             },
             ShellCmd::Unknown { cmd, args } => {
