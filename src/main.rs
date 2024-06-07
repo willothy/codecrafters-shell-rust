@@ -1,26 +1,110 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
-fn main() -> std::io::Result<()> {
-    loop {
+use chumsky::{
+    error::Cheap,
+    extra::Err,
+    primitive::{choice, just},
+    text::{digits, whitespace},
+    IterParser, Parser,
+};
+
+#[derive(Debug, Clone)]
+enum ShellCmd<'a> {
+    Builtin(Builtin),
+    #[allow(unused)]
+    Unknown {
+        cmd: &'a str,
+        args: Vec<String>,
+    },
+}
+
+impl<'a> ShellCmd<'a> {
+    pub fn parser() -> impl Parser<'a, &'a str, ShellCmd<'a>, Err<Cheap>> {
+        let builtin = Builtin::parser().map(ShellCmd::Builtin);
+
+        // TODO: Better shell splitting w/ strings, escapes etc.
+        let unknown = chumsky::primitive::none_of(" \t\r\n")
+            .repeated()
+            .to_slice()
+            .separated_by(whitespace().at_least(1).ignored())
+            .allow_leading()
+            .allow_trailing()
+            .collect()
+            .map(|mut args: Vec<&str>| {
+                let mut drain = args.drain(..);
+                ShellCmd::Unknown {
+                    cmd: drain.next().expect("command"),
+                    args: drain.map(str::to_owned).collect(),
+                }
+            });
+
+        choice((builtin, unknown))
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Builtin {
+    Exit { code: i32 },
+}
+
+impl Builtin {
+    pub fn parser<'a>() -> impl Parser<'a, &'a str, Builtin, Err<Cheap>> {
+        just("exit").then(whitespace().ignored()).ignore_then(
+            digits(10)
+                .to_slice()
+                .or_not()
+                .map(|digits: Option<&str>| {
+                    digits.map(|digits| digits.parse::<i32>().expect("to have been validated"))
+                })
+                .map(|code| Builtin::Exit {
+                    code: code.unwrap_or(0),
+                }),
+        )
+    }
+}
+
+fn main() -> eyre::Result<()> {
+    let mut input = String::new();
+
+    'mainloop: loop {
         // Print the prompt
         print!("$ ");
         io::stdout().flush()?;
 
+        input.clear();
+
         // Wait for user input
         let stdin = io::stdin();
-        let mut input = String::new();
         stdin.read_line(&mut input)?;
 
-        // Enter the main loop
-        match input.trim_end_matches('\n') {
-            "" => {}
-            cmd => {
-                println!("{cmd}: command not found");
+        if input.is_empty() {
+            continue;
+        }
+
+        let parsed = ShellCmd::parser().parse(input.trim());
+
+        if parsed.has_errors() {
+            for e in parsed.errors() {
+                println!("{e}");
+            }
+            // return Err(Report::);
+        }
+
+        match parsed.output().expect("to have output") {
+            ShellCmd::Builtin(builtin) => match builtin {
+                Builtin::Exit { code } => {
+                    if *code == 0 {
+                        break 'mainloop;
+                    }
+                    return Err(std::io::Error::from_raw_os_error(*code).into());
+                }
+            },
+            ShellCmd::Unknown { cmd, .. } => {
+                println!("{cmd}: command not found")
             }
         }
     }
 
-    #[allow(unreachable_code)]
     Ok(())
 }
