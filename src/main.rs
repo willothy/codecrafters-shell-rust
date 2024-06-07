@@ -46,21 +46,34 @@ impl<'a> ShellCmd<'a> {
 #[derive(Debug, Clone)]
 enum Builtin {
     Exit { code: i32 },
+    Echo { text: Vec<String> },
 }
 
 impl Builtin {
     pub fn parser<'a>() -> impl Parser<'a, &'a str, Builtin, Err<Cheap>> {
-        just("exit").then(whitespace().ignored()).ignore_then(
-            digits(10)
-                .to_slice()
-                .or_not()
-                .map(|digits: Option<&str>| {
-                    digits.map(|digits| digits.parse::<i32>().expect("to have been validated"))
-                })
-                .map(|code| Builtin::Exit {
-                    code: code.unwrap_or(0),
-                }),
-        )
+        choice((
+            just("exit").then(whitespace().ignored()).ignore_then(
+                digits(10)
+                    .to_slice()
+                    .or_not()
+                    .map(|digits: Option<&str>| {
+                        digits.map(|digits| digits.parse::<i32>().expect("to have been validated"))
+                    })
+                    .map(|code| Builtin::Exit {
+                        code: code.unwrap_or(0),
+                    }),
+            ),
+            just("echo").ignore_then(
+                chumsky::primitive::none_of(" \t\r\n")
+                    .repeated()
+                    .collect()
+                    .separated_by(whitespace().at_least(1).ignored())
+                    .allow_leading()
+                    .allow_trailing()
+                    .collect()
+                    .map(|args| Builtin::Echo { text: args }),
+            ),
+        ))
     }
 }
 
@@ -98,6 +111,15 @@ fn main() -> eyre::Result<()> {
                         break 'mainloop;
                     }
                     return Err(std::io::Error::from_raw_os_error(*code).into());
+                }
+                Builtin::Echo { text } => {
+                    text.iter().enumerate().for_each(|(i, s)| {
+                        print!("{s}");
+                        if i < text.len() - 1 {
+                            print!(" ");
+                        }
+                    });
+                    println!("");
                 }
             },
             ShellCmd::Unknown { cmd, .. } => {
